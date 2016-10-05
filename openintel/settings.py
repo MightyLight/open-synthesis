@@ -16,6 +16,7 @@ import os
 import logging
 import sys
 
+from django.utils.translation import ugettext_lazy as _
 import dj_database_url
 import environ
 
@@ -72,6 +73,7 @@ env = environ.Env(  # pylint: disable=invalid-name
     BANNER_MESSAGE=(str, None),
     PRIVACY_URL=(str, None),
     DIGEST_WEEKLY_DAY=(int, 0),  # default to Monday
+    CELERY_ALWAYS_EAGER=(bool, False),
 )
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
@@ -120,6 +122,9 @@ INSTALLED_APPS = [
 MIDDLEWARE_CLASSES = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # LocaleMiddleware must come after SessionMiddleware and before CommonMiddleware
+    # see: https://docs.djangoproject.com/en/1.10/topics/i18n/translation/#how-django-discovers-language-preference
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -218,7 +223,13 @@ SECURE_HSTS_SECONDS = env('SECURE_HSTS_SECONDS')
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.10/topics/i18n/
-
+LANGUAGES = (
+    # Add new locales in LANGUAGES variable, e.g., ('az', _('Azerbaijani'))
+    ('en-us', _('English (United States)')),
+)
+LOCALE_PATHS = (
+    os.path.join(BASE_DIR, 'locale'),
+)
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
@@ -416,3 +427,22 @@ def _get_cache():
 
 # https://docs.djangoproject.com/en/1.10/topics/cache/
 CACHES = _get_cache()
+
+# http://docs.celeryproject.org/en/latest/configuration.html
+# XXX: not sure why these have to be declared globally in addition to the celery app setup
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']  # set globally for safety
+CELERY_RESULT_SERIALIZER = 'json'
+if TESTING:
+    logger.info('Enabling CELERY_ALWAYS_EAGER for testing')
+    CELERY_ALWAYS_EAGER = True
+else:
+    CELERY_ALWAYS_EAGER = env('CELERY_ALWAYS_EAGER')
+
+if env.get_value('CELERY_BROKER_URL', cast=str, default=None):
+    CELERY_BROKER_URL = env('CELERY_BROKER_URL')
+    CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
+elif env.get_value('REDIS_URL', cast=str, default=None):
+    logger.info('No CELERY_BROKER_URL specified, using REDIS_URL for Celery broker and result backend')
+    CELERY_BROKER_URL = env('REDIS_URL')
+    CELERY_RESULT_BACKEND = env('REDIS_URL')

@@ -1,8 +1,14 @@
 # How to contribute
 
-We appreciate all pull requests. However, before working on an enhancement/feature, you should search to see if there's 
-already a discussion on the [Issue Tracker](https://github.com/twschiller/open-synthesis/issues). If not, you should 
-[start a new discussion](https://github.com/twschiller/open-synthesis/issues/new).
+We appreciate all pull requests. However, before working on an enhancement/feature, you should:
+- Search to see if there's  already a discussion on the [Issue Tracker](https://github.com/twschiller/open-synthesis/issues). If not, you should [start a new discussion](https://github.com/twschiller/open-synthesis/issues/new)
+- Let us know you're working on the issue, so that we can (1) help fill in any gaps in the requirements, and (2) avoid having multiple contributors do redundant work
+
+**Table of Contents**
+* [Setting up your development environment](#local-development)
+* [Code style and testing](#code-style-and-testing)
+* [Translating Open Synthesis to another language](#adding-a-translation)
+* [Acknowledgements and list of contributors](#acknowledgements)
 
 ## Local Development
 
@@ -36,7 +42,7 @@ Install the project requirements:
 Create a local environment configuration by copying the defaults in `env.sample`:
 
     cp env.sample .env
-    
+        
 Package the static files for the project:
     
     webpack --config webpack.config.js
@@ -50,23 +56,87 @@ Create the database schema, and load the initial application data:
 
     python manage.py migrate
     python manage.py loaddata source_tags 
-    
-Serve the Django application using [Gunicorn](http://gunicorn.org/):
+   
+### Web Server
+   
+To run the Django development server, which automatically reloads modules when you
+edit a file:
+
+    python manage.py runserver
+   
+To serve the Django application using [Gunicorn](http://gunicorn.org/):
 
     gunicorn -c conf.py openintel.wsgi --log-file -
     
-If you are using Heroku, you can run the project with:    
+If you are using Heroku, you can also run the Gunicorn server with:    
     
     heroku local web
+    
+### Celery Task Runner
+    
+If you have a local instance of [Redis](http://redis.io/), you can configure Celery to use
+it as broker/result store by setting `REDIS_URL` and `CELERY_ALWAYS_EAGER` in the `.env` file:
+
+    REDIS_URL=redis://localhost:6379
+    CELERY_ALWAYS_EAGER=False
+    
+Then run the Celery worker:
+
+    celery worker --app=openintel.celery.app
+    
+If you are using Heroku, you can also run the worker with:
+
+    heroku local worker
     
 ## Code Style and Testing
 
 Before submitting a pull request, please review the 
 [quality control wiki](https://github.com/twschiller/open-synthesis/wiki/Quality-Controls).
 
+## Adding a Translation
+
+If you want to help translate Open Synthesis but don't want to set up local development environment, let us know
+and we'll assist you.
+
+First, if you haven't already, follow the instructions above to [set up your local development environment](#local-development). 
+Next, install [GNU gettext](https://www.gnu.org/software/gettext/).
+If you're using [Homebrew](http://brew.sh/index.html), the following commands install and link gettext:
+
+    brew install gettext
+    brew link --force gettext
+
+Create a translation file for your locale with the [makemessages](https://docs.djangoproject.com/en/1.10/ref/django-admin/#makemessages) 
+command. A list of language codes is available [here](http://www.oracle.com/technetwork/java/javase/javase7locales-334809.html).
+For example, to create a British English translation, use the following command:
+
+    python manage.py makemessages --locale=en_GB
+
+This will create a folder for the locale in the `local` directory with a messages file `django.po`. Translate the
+messages by filling in the `msgstr` fields in the messages file.
+
+Compile the translations with the [compilemessages](https://docs.djangoproject.com/en/1.10/ref/django-admin/#compilemessages) 
+command:
+
+    python manage.py compilemessages
+
+Add your translation to the `openintel/settings.py` file. Note that the language corresponding to the locale is lower
+case and uses a hypen `-` instead of an underscore `_`. So locale `en_GB` becomes `en-gb`:
+
+    LANGUAGES = (
+        ('en-us', _('English (United States)')),
+        ('en-gb', _('English (British)')),
+    )
+
+Your translation should now be available when you restart your server. If you're still seeing English, double-check
+that your browser is requesting the page in the language you created.
+
 # Acknowledgements
 
-We gratefully acknowledge this project's 3rd-party libraries and their contributors. See [here](requirements.txt) and 
+## Contributors
+* [Emin Mastizada](https://github.com/mastizada): internationalization
+
+## Third-Party Libraries and Services
+We gratefully acknowledge this project's third-party libraries and their contributors. See [here](requirements.txt) and 
 [here](package.json). Additionally, we'd like to acknowledge the following:
 
 * SSL/TLS certificate generated with [Let's Encrypt](https://letsencrypt.org/)
